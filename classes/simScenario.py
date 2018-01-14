@@ -93,7 +93,6 @@ class simScenario:
 		self.expenseList = []
 
 	def recordValues(self):
-
 		self.timeHistory = hstack([
 			self.timeHistory, self.currentTime])
 		self.cashHistory = hstack([
@@ -194,6 +193,7 @@ class simScenario:
 		else:
 			highestBracket = taxableIncome*percent[0]/100
 			lowerBrackets = 0
+
 		self.currentTaxBill = highestBracket + lowerBrackets
 
 		self.currentTaxesPaid += (self.currentTaxBill + self.currentFICABill - withholding)
@@ -335,15 +335,8 @@ class simScenario:
 			self.resetCurrent(resetTime=0,resetCash=0)
 
 			for loan in self.loanList:
-				loan.principalHistory = hstack([
-					loan.principalHistory,
-					loan.currentPrincipal])
-				loan.accruedInterestHistory = hstack([
-					loan.accruedInterestHistory,
-					loan.currentAccruedInterest])
-				loan.paymentHistory = hstack([
-					loan.paymentHistory,
-					loan.currentPayment])
+				loan.recordValues()
+				loan.resetCurrent()
 
 			for investment in self.investmentList:
 				investment.recordValues()

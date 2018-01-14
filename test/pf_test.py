@@ -137,7 +137,6 @@ def test_add_jobs():
 			) < 1e-6
 			)
 
-
 	scen.reset()
 	scen.addJobs([job1,job2])
 	scen.propagate()
@@ -147,9 +146,12 @@ def test_add_jobs():
 		totalSalary += job.initialSalary
 
 	assert ( 
-			scen.finalCash - \
-			scen.initialCash + \
-			sum(scen.taxesPaidHistory) == totalSalary )
+			abs(
+				scen.finalCash - \
+				scen.initialCash + \
+				sum(scen.taxesPaidHistory) - totalSalary 
+				) < 1e-6
+			)
 
 
 def test_addInvestments():
@@ -248,21 +250,24 @@ def test_addLoans():
 	scen.addJobs([job1,job2])
 	scen.addLoans([loan1,loan2,loan3])
 
-	totalSalary = 0
+	totalSalary = 0.
 	for job in scen.jobList:
 		totalSalary += job.initialSalary
 
+	pdb.set_trace()
 	scen.propagate()
 
-	totalInterest = 0
-	totalPayment = 0
-	totalInitialPrincipal = 0
-	totalFinalPrincipal = 0
+	totalInterest = 0.
+	totalPayment = 0.
+	totalInitialPrincipal = 0.
+	totalFinalPrincipal = 0.
 	for loan in scen.loanList:
 		totalInterest += sum(loan.accruedInterestHistory)
 		totalPayment += sum(loan.paymentHistory)
 		totalInitialPrincipal += loan.initialPrincipal
 		totalFinalPrincipal += loan.currentPrincipal
+	pdb.set_trace()
+
 	assert(
 		abs(
 			totalInterest + \
@@ -276,7 +281,7 @@ def test_addLoans():
 		abs(
 			totalSalary + \
 			scen.initialCash - \
-			scen.cashHistory[-1] - \
+			scen.finalCash - \
 			sum(scen.taxesPaidHistory) - \
 			totalPayment
 			) < 1e-6

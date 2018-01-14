@@ -92,7 +92,6 @@ class loan:
 
 		self.currentAccruedInterest = 0
 		self.currentPayment = 0
-		self.currentPrincipal = 0
 
 	def resetHistory(self):
 		#clear history arrays
@@ -102,6 +101,15 @@ class loan:
 
 	def resetChildren(self):
 		pass
+
+	def recordValues(self):
+		self.principalHistory = hstack([
+			self.principalHistory, self.currentPrincipal])
+		self.accruedInterestHistory = hstack([
+			self.accruedInterestHistory, self.currentAccruedInterest])
+		self.paymentHistory = hstack([
+			self.paymentHistory, self.currentPayment])
+
 
 	def recordFinalValues(self):
 		self.finalAccruedInterest = self.accruedInterestHistory[-1]
@@ -128,7 +136,7 @@ class loan:
 			amt = self.minimumPayment
 
 		paymentDOM = 1
-
+		print(amt)
 		if self.simScenario.currentDate.day == 1:
 			if self.currentPrincipal > amt:
 				self.currentPrincipal -= amt
@@ -147,7 +155,7 @@ class job:
 		self.withholding = 0
 		self.initialSalary = 0
 		#use reset methods to initialize values and history arrays
-		self.resetCurrent(resetSalary=1)
+		self.resetCurrent(resetSalary=1,resetYTD=1,resetWithheldTax=1)
 		self.resetHistory()
 		self.resetChildren()
 
@@ -158,12 +166,21 @@ class job:
 				self.currentSalary = self.initialSalary
 		except:
 			pass
+		try:
+			if kwargs['resetYTD'] == 1:
+				self.currentYearToDatePay = 0
+		except:
+			pass
+		try:
+			if kwargs['resetWithheldTax'] == 1:
+				self.currentWithheldTax = 0
+		except:
+			pass
 
 		self.currentIRAContributions = 0
 		self.current401kContributions = 0
 		self.currentMonthlyPay = 0
-		self.currentWithheldTax = 0
-		self.currentYearToDatePay = 0
+		
 
 	def resetHistory(self):
 		#clear history arrays
@@ -203,8 +220,9 @@ class job:
 
 	def payday(self):
 		if self.simScenario.currentDate.day == self.payDOM:
-			self.currentMonthlyPay = self.currentSalary/12
+			self.currentMonthlyPay = self.currentSalary/12.
 			self.currentYearToDatePay += self.currentMonthlyPay
+			print(self.currentYearToDatePay)
 			#pay taxes
 			self.withhold()
 

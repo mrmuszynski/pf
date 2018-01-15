@@ -7,7 +7,7 @@
 #	Synopsis: Vehicle portion of the explorer object model
 # 
 ###############################################################################
-from numpy import hstack, exp, array
+from numpy import hstack, exp, array, cumsum
 from datetime import date
 from numpy.random import normal
 import sys
@@ -35,11 +35,15 @@ class investment:
 			pass
 		self.currentInterest = 0
 		self.currentContribution = 0
+		self.currentWithdrawl = 0
+
 	def resetHistory(self):
 		#clear history arrays
 		self.principalHistory = []
 		self.interestHistory = []
 		self.contributionHistory = []
+		self.withdrawlHistory = []
+
 	def resetChildren(self):
 		pass
 
@@ -50,6 +54,8 @@ class investment:
 			self.interestHistory, self.currentInterest])
 		self.contributionHistory = hstack([
 			self.contributionHistory, self.currentContribution])
+		self.withdrawlHistory = hstack([
+			self.withdrawlHistory, self.currentWithdrawl])
 
 	def recordFinalValues(self):
 		self.finalPrincipal = self.principalHistory[-1]
@@ -72,6 +78,23 @@ class investment:
 		self.currentContribution += amount
 		self.simScenario.currentCash -= amount
 
+	def withdraw(self,amount):
+		self.currentPrincipal -= amount
+		self.currentWithdrawl += amount
+		self.simScenario.currentCash += amount
+
+
+	def checkConserved(self):
+		conservedQuantity = \
+			self.principalHistory - \
+			cumsum(self.contributionHistory) - \
+			cumsum(self.interestHistory) - \
+			self.withdrawlHistory 
+		isConserved = sum(abs(conservedQuantity - self.initialPrincipal))/\
+			len(conservedQuantity) < 1e-6
+
+		return isConserved
+
 class loan:
 	def __init__(self):
 		self.name = -1
@@ -90,12 +113,12 @@ class loan:
 		except:
 			pass
 
-		self.currentAccruedInterest = 0
+		self.currentInterest = 0
 		self.currentPayment = 0
 
 	def resetHistory(self):
 		#clear history arrays
-		self.accruedInterestHistory = []
+		self.interestHistory = []
 		self.paymentHistory = []
 		self.principalHistory = []
 
@@ -105,27 +128,27 @@ class loan:
 	def recordValues(self):
 		self.principalHistory = hstack([
 			self.principalHistory, self.currentPrincipal])
-		self.accruedInterestHistory = hstack([
-			self.accruedInterestHistory, self.currentAccruedInterest])
+		self.interestHistory = hstack([
+			self.interestHistory, self.currentInterest])
 		self.paymentHistory = hstack([
 			self.paymentHistory, self.currentPayment])
 
 
 	def recordFinalValues(self):
-		self.finalAccruedInterest = self.accruedInterestHistory[-1]
+		self.finalinterest = self.interestHistory[-1]
 		self.finalPayment = self.paymentHistory[-1]
 		self.finalPrincipal = self.principalHistory[-1]
 
 	def accrue(self):
 		# A = P*e^(rt)
 		# A = P*(1+r/n)^(nt))
-		self.currentAccruedInterest = 0
+		self.currentInterest = 0
 		self.currentPayment = 0
 		P = self.currentPrincipal
 		r = self.interestRate/100.
 		t = self.simScenario.timeStep/365.
 		newPrincipal = P*exp(r*t)
-		self.currentAccruedInterest = \
+		self.currentInterest = \
 			newPrincipal - P
 		self.currentPrincipal = newPrincipal
 
@@ -136,7 +159,6 @@ class loan:
 			amt = self.minimumPayment
 
 		paymentDOM = 1
-		print(amt)
 		if self.simScenario.currentDate.day == 1:
 			if self.currentPrincipal > amt:
 				self.currentPrincipal -= amt
@@ -146,6 +168,17 @@ class loan:
 				self.simScenario.currentCash -= self.currentPrincipal
 				self.currentPayment += self.currentPrincipal
 				self.currentPrincipal = 0
+
+	def checkConserved(self):
+		conservedQuantity = \
+			self.principalHistory + \
+			cumsum(self.paymentHistory) - \
+			cumsum(self.interestHistory)
+
+		isConserved = sum(abs(conservedQuantity - self.initialPrincipal))/\
+			len(conservedQuantity) < 1e-6
+
+		return isConserved
 
 class job:
 	def __init__(self):
@@ -222,7 +255,6 @@ class job:
 		if self.simScenario.currentDate.day == self.payDOM:
 			self.currentMonthlyPay = self.currentSalary/12.
 			self.currentYearToDatePay += self.currentMonthlyPay
-			print(self.currentYearToDatePay)
 			#pay taxes
 			self.withhold()
 
@@ -243,7 +275,7 @@ class job:
 				self.salary*investment.employerContributionPercent/100/12
 
 	def withhold(self):
-		self.monthlyPay -= self.withholding
+		self.currentMonthlyPay -= self.withholding
 		self.currentWithheldTax += self.withholding
 
 

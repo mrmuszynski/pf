@@ -16,6 +16,7 @@ import pdb
 from datetime import date
 import matplotlib.pyplot as plt
 from numpy.random import normal
+from numpy import cumsum
 
 ###############################################################################
 #
@@ -102,199 +103,45 @@ loan3.minimumPayment = loan3.initialPrincipal/100
 
 ###############################################################################
 #
-#	Run tests
+#	Conservation tests. Each object has a quantity that must be conserved.
+#	These are codified in the checkConserved() method of each class.
 #
 ###############################################################################
 
-
-def test_null():
-	'''!
-	The null test checks to make sure that nothing changes throughout
-	the scenario when no values are set. This scenario has no jobs,
-	no investments, and no loans.
-	'''
+def test_investmentConservedQuantity():
+	#this test is weak. we need to define some investment contributions
+	#for it to be finished
 	scen.reset()
-	scen.propagate()
-	assert ( scen.finalCash == 10000 )
-
-
-def test_add_jobs():
-	'''!
-	test_add_jobs() tests that job salaries are being applied correctly
-	with no expenses, loans, or investments. job1 is added and the 
-	scenario is run for a year. At the end of the year, we check that
-	the cash is equal to a year's salary plus the initial scenario cash.
-	Then job2 is added and the same test is performed
-	'''
-	scen.reset()
-	scen.addJobs([job1])
-	scen.propagate()
-	assert ( 
-			abs(
-				scen.finalCash - \
-				scen.initialCash + \
-				sum(scen.taxesPaidHistory) - job1.initialSalary 
-			) < 1e-6
-			)
-
-	scen.reset()
-	scen.addJobs([job1,job2])
-	scen.propagate()
-	totalSalary = 0
-
-	for job in scen.jobList:
-		totalSalary += job.initialSalary
-
-	assert ( 
-			abs(
-				scen.finalCash - \
-				scen.initialCash + \
-				sum(scen.taxesPaidHistory) - totalSalary 
-				) < 1e-6
-			)
-
-
-def test_addInvestments():
-	'''!
-	test_addInvestments() tests that investments are accruing correctly
-	and that contributions are correctly being correctly applied to loans
-	and removed from cash.
-	Three investements are added to the scenario with randomized initial
-	principal and interest rate.
-	The first assertion checks that the final value of the investment is 
-	initial investment plus all accrued interest and any contributions.
-	The second assertion checks that the final cash in the scenario is
-	equal to the full salary draw and initial cash minus contributions
-	and cash leftover at the end of the scenario.
-	'''
-
-	scen.reset()
-	scen.addJobs([job1,job2])
+	scen.addJobs([job1, job2])
 	scen.addInvestments([investment1, investment2, investment3])
-
-	totalSalary = 0
-	for job in scen.jobList:
-		totalSalary += job.initialSalary
-
 	scen.propagate()
-	totalPrincipal = 0
-	totalContribution = 0
-	totalInterest = 0
-	totalInitialPrincipal = 0
+	for investment in scen.investmentList:
+		assert( investment.checkConserved() )
+
+def test_loanConservedQuantity():
+	scen.reset()
+	scen.addJobs([job1, job2])
+	scen.addLoans([loan1, loan2, loan3])
+	scen.propagate()
+	for loan in scen.loanList:
+		assert( loan.checkConserved() )
+
+def test_cashConserved():
+	scen.reset()
+	scen.addJobs([job1, job2])
+	scen.addLoans([loan1, loan2, loan3])
+	scen.addInvestments([investment1, investment2, investment3])
+	scen.addExpenses([exp1, exp2])
+	scen.propagate()
+	scen.investmentList[0].contribute(amount =100)
+
+	#I think something is wrong here. investments don't seem to be working right with cashflow.
 
 	for investment in scen.investmentList:
-		totalPrincipal += investment.finalPrincipal
-		totalInterest += sum(investment.interestHistory)
-		totalContribution += sum(investment.contributionHistory)
-		totalInitialPrincipal += investment.initialPrincipal
-
-	assert (
-		abs(
-		totalPrincipal - \
-		totalInterest - \
-		totalContribution - \
-		totalInitialPrincipal) < 1e-6
-		)
-	assert(
-		abs(
-			totalSalary + \
-			scen.initialCash - \
-			scen.currentCash - \
-			totalContribution - \
-			sum(scen.taxesPaidHistory)
-			) < 1e-6
-		)
-
-def test_addExpenses():
-	'''!
-	test_addExpenses() tests that expenses are correctly being removed from
-	cash supplies. There are the same two jobs as above with two expenses.
-	There are no loans or investments in this scenario. The assertion makes
-	sure that the total incoming cash (from salary) minus the final cash of 
-	the scenario minus the total spend on the expenses plus the initial cash 
-	of the scenario is zero
-	'''
-	scen.reset()
-	scen.addExpenses([exp1,exp2])
-	scen.addJobs([job1,job2])
-	scen.propagate()
-
-	totalSalary = 0
-	for job in scen.jobList:
-		totalSalary += job.initialSalary
-	totalSpend = 0
-	for expense in scen.expenseList:
-		totalSpend += sum(expense.spendHistory)
-
-	assert( 
-		abs(
-		totalSalary - \
-		scen.currentCash - \
-		sum(scen.taxesPaidHistory) - \
-		totalSpend + \
-		scen.initialCash
-		) < 1e-6
-		)
-
-
-def test_addLoans():
-	'''!
-	test_addLoans() tests that loans are correctly applied. The same jobs
-	as above are added to the scenario. The default behavior of the system
-	is to pay minimum amounts to all loans on their payment DOM. The total
-	paid is tracked. The asserts in this scenario check that the initial
-	amount of the loan plus all accrued interest minus all payments during
-	the scenario period.
-	'''
-	scen.reset()
-	scen.addJobs([job1,job2])
-	scen.addLoans([loan1,loan2,loan3])
-
-	totalSalary = 0.
-	for job in scen.jobList:
-		totalSalary += job.initialSalary
-
-	pdb.set_trace()
-	scen.propagate()
-
-	totalInterest = 0.
-	totalPayment = 0.
-	totalInitialPrincipal = 0.
-	totalFinalPrincipal = 0.
+		assert( investment.checkConserved() )
 	for loan in scen.loanList:
-		totalInterest += sum(loan.accruedInterestHistory)
-		totalPayment += sum(loan.paymentHistory)
-		totalInitialPrincipal += loan.initialPrincipal
-		totalFinalPrincipal += loan.currentPrincipal
-	pdb.set_trace()
-
-	assert(
-		abs(
-			totalInterest + \
-			totalInitialPrincipal - \
-			totalPayment - \
-			totalFinalPrincipal
-			) < 1e-6
-		)
-
-	assert( 
-		abs(
-			totalSalary + \
-			scen.initialCash - \
-			scen.finalCash - \
-			sum(scen.taxesPaidHistory) - \
-			totalPayment
-			) < 1e-6
-		)
-
-# def test_withholding():
-# 	scen.reset()
-# 	scen.addJobs([job1,job2])
-# 	scen.propagate()
-# 	pdb.set_trace()
-
-
-
+		assert( loan.checkConserved() )
+	assert( scen.checkConserved() )
 
 
 

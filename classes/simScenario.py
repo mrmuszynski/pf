@@ -7,7 +7,7 @@
 #	Synopsis: Vehicle portion of the explorer object model
 # 
 ###############################################################################
-from numpy import empty, hstack, array
+from numpy import empty, hstack, array, cumsum
 import datetime
 from sys import exit
 import pdb
@@ -135,16 +135,41 @@ class simScenario:
 			job.simScenario = self
 			self.jobList.append(job)
 
+	def checkConserved(self):
+		totalSpend = 0
+		totalPayment = 0
+		totalPaycheck = 0
+		totalContribution = 0
+		for expense in self.expenseList:
+			totalSpend += cumsum(expense.spendHistory)
+		for loan in self.loanList:
+			totalPayment += cumsum(loan.paymentHistory)
+		for job in self.jobList:
+			totalPaycheck += cumsum(job.monthlyPayHistory)
+		for investment in self.investmentList:
+			totalContribution += cumsum(investment.contributionHistory)
+
+		conservedQuantity = \
+			self.cashHistory + \
+			totalSpend + \
+			totalPayment - \
+			totalPaycheck + \
+			totalContribution + \
+			cumsum(self.taxesPaidHistory)
+		print(conservedQuantity)
+
+		isConserved = sum(abs(conservedQuantity - self.initialCash))/\
+			len(conservedQuantity) < 1e-6
+
+		return isConserved
 
 	def payTaxes(self,taxType):
-		taxableIncome = 0
-		withholding = 0
+		taxableIncome = 0.
+		withholding = 0.
 		for job in self.jobList: 
 			taxableIncome += job.currentYearToDatePay 
 			taxableIncome -= job.currentIRAContributions%18500
 			taxableIncome -= job.current401kContributions%5500
-			withholding += job.currentWithheldTax
-			job.currentWithheldTax = 0
 			#also remove monthly pretax payments
 
 		if taxType == 'California':
@@ -162,6 +187,11 @@ class simScenario:
 			personalExemption = 222
 
 		elif taxType == 'Federal':
+			for job in self.jobList: 
+				withholding += job.currentWithheldTax
+				job.currentWithheldTax = 0.
+				#also remove monthly pretax payments
+
 			standardDeduction = 24000
 
 			dollarAmt = array([
@@ -177,7 +207,7 @@ class simScenario:
 			socialSecurityBill = min([taxableIncome,118500])*0.062
 			medicareBill = taxableIncome*0.0145
 
-			self.currentFICABill = (socialSecurityBill + medicareBill)
+			self.currentFICABill = socialSecurityBill + medicareBill
 
 
 		#this is ugly AF
@@ -291,10 +321,11 @@ class simScenario:
 
 
 			if self.currentTime%365 == 105:
-				self.payTaxes('California')
 				self.payTaxes('Federal')
-				for job in self.jobList: job.currentYearToDatePay = 0
-
+				self.payTaxes('California')
+				for job in self.jobList: 
+					job.currentYearToDatePay = 0
+					job.currentWithheldTax = 0
 
 			# if self.currentTime%365 == 1:
 			# 	for job in self.jobList:
@@ -331,6 +362,7 @@ class simScenario:
 			#	loan payments)
 			#
 			###########################################################
+
 			self.recordValues()
 			self.resetCurrent(resetTime=0,resetCash=0)
 

@@ -188,7 +188,7 @@ class job:
 		self.withholding = 0
 		self.initialSalary = 0
 		#use reset methods to initialize values and history arrays
-		self.resetCurrent(resetSalary=1,resetYTD=1,resetWithheldTax=1)
+		self.resetCurrent(resetSalary=1)
 		self.resetHistory()
 		self.resetChildren()
 
@@ -199,21 +199,12 @@ class job:
 				self.currentSalary = self.initialSalary
 		except:
 			pass
-		try:
-			if kwargs['resetYTD'] == 1:
-				self.currentYearToDatePay = 0
-		except:
-			pass
-		try:
-			if kwargs['resetWithheldTax'] == 1:
-				self.currentWithheldTax = 0
-		except:
-			pass
 
+		self.currentPay = 0
 		self.currentIRAContributions = 0
 		self.current401kContributions = 0
 		self.currentMonthlyPay = 0
-		
+		self.currentWithheldTax = 0
 
 	def resetHistory(self):
 		#clear history arrays
@@ -222,7 +213,7 @@ class job:
 		self._401kContributionHistory = []
 		self.monthlyPayHistory = []
 		self.withheldTaxHistory = []
-		self.yearToDatePayHistory = []
+		self.payHistory = []
 
 	def resetChildren(self):
 		self.retirementAccounts = []
@@ -238,8 +229,8 @@ class job:
 			self.monthlyPayHistory, self.currentMonthlyPay])
 		self.withheldTaxHistory = hstack([
 			self.withheldTaxHistory, self.currentWithheldTax])
-		self.yearToDatePayHistory = hstack([
-			self.yearToDatePayHistory, self.currentYearToDatePay])
+		self.payHistory = hstack([
+			self.payHistory, self.currentPay])
 
 	def recordFinalValues(self):
 		self.finalSalary = self.salaryHistory[-1]
@@ -247,14 +238,23 @@ class job:
 		self.final401kContributions = self._401kContributionHistory[-1]
 		self.finalMonthlyPay = self.monthlyPayHistory[-1]
 		self.finalWithheldTax = self.withheldTaxHistory[-1]
-		self.finalYearToDatePay = self.yearToDatePayHistory[-1]
+		self.finalPay = self.payHistory[-1]
 
+	def checkConserved(self):
+		conservedQuantity = \
+			self.withheldTaxHistory + \
+			self.monthlyPayHistory + \
+			self.IRAContributionHistory + \
+			self._401kContributionHistory
 
+		isConserved = sum(abs(conservedQuantity - self.payHistory))/\
+			len(conservedQuantity) < 1e-6
+		return isConserved
 
 	def payday(self):
 		if self.simScenario.currentDate.day == self.payDOM:
 			self.currentMonthlyPay = self.currentSalary/12.
-			self.currentYearToDatePay += self.currentMonthlyPay
+			self.currentPay += self.currentMonthlyPay
 			#pay taxes
 			self.withhold()
 

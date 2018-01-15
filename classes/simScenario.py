@@ -8,7 +8,7 @@
 # 
 ###############################################################################
 from numpy import empty, hstack, array, cumsum
-import datetime
+from datetime import timedelta
 from sys import exit
 import pdb
 
@@ -140,6 +140,7 @@ class simScenario:
 		totalPayment = 0
 		totalPaycheck = 0
 		totalContribution = 0
+		totalWithdrawl = 0
 		for expense in self.expenseList:
 			totalSpend += cumsum(expense.spendHistory)
 		for loan in self.loanList:
@@ -148,11 +149,13 @@ class simScenario:
 			totalPaycheck += cumsum(job.monthlyPayHistory)
 		for investment in self.investmentList:
 			totalContribution += cumsum(investment.contributionHistory)
+			totalWithdrawl += cumsum(investment.withdrawlHistory)
 
 		conservedQuantity = \
 			self.cashHistory + \
 			totalSpend + \
 			totalPayment - \
+			totalWithdrawl - \
 			totalPaycheck + \
 			totalContribution + \
 			cumsum(self.taxesPaidHistory)
@@ -163,13 +166,29 @@ class simScenario:
 
 		return isConserved
 
+	# def checkTaxConserved(self):
+	# 	conservedQuantity = 
+	# 	payHistory
+	# 	pdb.set_trace()
+	# 	isConserved = True
+	# 	return isConserved
+
 	def payTaxes(self,taxType):
 		taxableIncome = 0.
 		withholding = 0.
-		for job in self.jobList: 
-			taxableIncome += job.currentYearToDatePay 
-			taxableIncome -= job.currentIRAContributions%18500
-			taxableIncome -= job.current401kContributions%5500
+		thisYear = (self.startDate + timedelta(self.currentTime)).year
+		lastYear = thisYear - 1
+		yearArray = array([(self.startDate + \
+			timedelta(i)).year for i in self.timeHistory])
+		ind = yearArray == lastYear
+
+		for job in self.jobList:
+			lastYearIRA = sum(job.IRAContributionHistory[ind])
+			lastYear401k = sum(job._401kContributionHistory[ind])
+			lastYearPay = sum(job.payHistory[ind])
+			taxableIncome += lastYearPay
+			taxableIncome -= max([lastYearIRA, 18500])
+			taxableIncome -= max([lastYear401k, 5500])
 			#also remove monthly pretax payments
 
 		if taxType == 'California':
@@ -183,12 +202,12 @@ class simScenario:
 				1, 2, 4, 6, 8, 9.3,
 				10.3, 11.3, 12.3
 				])
-			self.currentFICABill = 0
+			self.currentFICABill += 0
 			personalExemption = 222
 
 		elif taxType == 'Federal':
 			for job in self.jobList: 
-				withholding += job.currentWithheldTax
+				withholding += sum(job.withheldTaxHistory[ind])
 				job.currentWithheldTax = 0.
 				#also remove monthly pretax payments
 
@@ -207,8 +226,7 @@ class simScenario:
 			socialSecurityBill = min([taxableIncome,118500])*0.062
 			medicareBill = taxableIncome*0.0145
 
-			self.currentFICABill = socialSecurityBill + medicareBill
-
+			self.currentFICABill += socialSecurityBill + medicareBill
 
 		#this is ugly AF
 		taxableIncome -= standardDeduction
@@ -273,7 +291,7 @@ class simScenario:
 
 		while self.currentTime <= self.endTime:
 			self.currentTime += self.timeStep
-			self.currentDate = self.startDate + datetime.timedelta(
+			self.currentDate = self.startDate + timedelta(
 				self.currentTime)
 
 			###########################################################

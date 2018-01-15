@@ -25,7 +25,7 @@ from numpy import cumsum
 ###############################################################################
 
 scen = simScenario.simScenario()
-scen.startDate = date(2018, 1, 1)
+scen.startDate = date(2017, 7, 1)
 scen.initialCash = 10000
 
 ###############################################################################
@@ -126,6 +126,13 @@ def test_loanConservedQuantity():
 	for loan in scen.loanList:
 		assert( loan.checkConserved() )
 
+def test_jobConservedQuantity():
+	scen.reset()
+	scen.addJobs([job1, job2])
+	scen.propagate()
+	for job in scen.jobList:
+		assert( job.checkConserved() )
+
 def test_cashConserved():
 	scen.reset()
 	scen.addJobs([job1, job2])
@@ -133,17 +140,23 @@ def test_cashConserved():
 	scen.addInvestments([investment1, investment2, investment3])
 	scen.addExpenses([exp1, exp2])
 	scen.propagate()
-	scen.investmentList[0].contribute(amount =100)
-
-	#I think something is wrong here. investments don't seem to be working right with cashflow.
-
 	for investment in scen.investmentList:
 		assert( investment.checkConserved() )
 	for loan in scen.loanList:
 		assert( loan.checkConserved() )
 	assert( scen.checkConserved() )
 
+#still not sure the best way to test taxes.
+#scen.withheldTaxHistory is already cumulative, so summing it
+#doesn't really work the same way 
+scen.reset()
+scen.addJobs([job1, job2])
+scen.addLoans([loan1, loan2, loan3])
+scen.addInvestments([investment1, investment2, investment3])
+scen.addExpenses([exp1, exp2])
+scen.propagate()
 
+pdb.set_trace()
 
 
 

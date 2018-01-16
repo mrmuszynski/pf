@@ -158,16 +158,14 @@ class loan:
 		except:
 			amt = self.minimumPayment
 
-		paymentDOM = 1
-		if self.simScenario.currentDate.day == 1:
-			if self.currentPrincipal > amt:
-				self.currentPrincipal -= amt
-				self.simScenario.currentCash -= amt
-				self.currentPayment += amt
-			else:
-				self.simScenario.currentCash -= self.currentPrincipal
-				self.currentPayment += self.currentPrincipal
-				self.currentPrincipal = 0
+		if self.currentPrincipal > amt:
+			self.currentPrincipal -= amt
+			self.simScenario.currentCash -= amt
+			self.currentPayment += amt
+		else:
+			self.simScenario.currentCash -= self.currentPrincipal
+			self.currentPayment += self.currentPrincipal
+			self.currentPrincipal = 0
 
 	def checkConserved(self):
 		conservedQuantity = \
@@ -187,6 +185,12 @@ class job:
 		self.monthlyPay = -1
 		self.withholding = 0
 		self.initialSalary = 0
+		self.employer401kContributionPercent = 0
+		self.employer401kContributionStart = 0
+		self.employee401kContribution = 0
+		self.employer401kMatchPercent = 0
+		self.employer401kMaximumMatch = 0
+
 		#use reset methods to initialize values and history arrays
 		self.resetCurrent(resetSalary=1)
 		self.resetHistory()
@@ -266,18 +270,20 @@ class job:
 	def contribute(self):
 		for investment in self.retirementAccounts:
 			#employee contributions deduct from monthlyPay
-			self.monthlyPay -= investment.contributionLevel
-			investment.currentPrincipal += investment.contributionLevel
-			self.current401kContributions += investment.contributionLevel
-
-			#employer contributions do not
-			investment.currentPrincipal += \
-				self.salary*investment.employerContributionPercent/100/12
+			self.currentMonthlyPay -= self.employee401kContribution
+			investment.currentPrincipal += self.employee401kContribution
+			self.current401kContributions += self.employee401kContribution
+			print(self.simScenario.currentTime)
+			if self.simScenario.currentTime > self.employer401kContributionStart:
+				employerContribution = self.currentSalary/12.*\
+					self.employer401kContributionPercent/100
+				investment.currentPrincipal += employerContribution
+				self.current401kContributions += employerContribution
+				print(employerContribution)
 
 	def withhold(self):
 		self.currentMonthlyPay -= self.withholding
 		self.currentWithheldTax += self.withholding
-
 
 	def addRetirementAccounts(self, accounts):
 		for account in accounts:

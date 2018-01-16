@@ -7,8 +7,9 @@
 #	Synopsis: Vehicle portion of the explorer object model
 # 
 ###############################################################################
-from numpy import empty, hstack, array, cumsum
+from numpy import empty, hstack, array, cumsum, zeros
 from datetime import timedelta
+import matplotlib.pyplot as plt
 from sys import exit
 import pdb
 
@@ -19,6 +20,7 @@ class simScenario:
 		self.endTime = self.startTime + 365
 		self.timeStep = 1
 		self.initialCash = 0
+		self.initialSavings = 0
 
 		#lists of objects belonging to scenario
 		self.loanList = []
@@ -48,11 +50,16 @@ class simScenario:
 				self.currentCash = self.initialCash
 		except:
 			pass
+		try:
+			if kwargs['resetSavings'] == 1: 
+				self.currentSavings = self.initialSavings
+		except:
+			pass
 
-		self.currentSavings = 0
 		self.currentTaxesPaid = 0
 		self.currentTaxBill = 0
 		self.currentFICABill = 0
+		self.currentSpendingMoney = 0
 
 	def resetHistory(self):
 		#clear history arrays
@@ -62,6 +69,7 @@ class simScenario:
 		self.taxesPaidHistory = []
 		self.taxBillHistory = []
 		self.FICABillHistory = []
+		self.spendingMoneyHistory = []
 
 	def resetChildren(self):
 		#clear investments
@@ -105,6 +113,8 @@ class simScenario:
 			self.taxBillHistory, self.currentTaxBill])
 		self.FICABillHistory = hstack([
 			self.FICABillHistory, self.currentFICABill])
+		self.spendingMoneyHistory = hstack([
+			self.spendingMoneyHistory, self.currentSpendingMoney])
 
 	def recordFinalValues(self):
 		self.finalTime = self.timeHistory[-1]
@@ -153,13 +163,13 @@ class simScenario:
 
 		conservedQuantity = \
 			self.cashHistory + \
+			self.savingsHistory + \
 			totalSpend + \
 			totalPayment - \
 			totalWithdrawl - \
 			totalPaycheck + \
 			totalContribution + \
 			cumsum(self.taxesPaidHistory)
-		print(conservedQuantity)
 
 		isConserved = sum(abs(conservedQuantity - self.initialCash))/\
 			len(conservedQuantity) < 1e-6
@@ -247,17 +257,103 @@ class simScenario:
 		self.currentTaxesPaid += (self.currentTaxBill + self.currentFICABill - withholding)
 		self.currentCash -= (self.currentTaxBill + self.currentFICABill - withholding)
 
+	def plotLoanPrincipal(self):
+		f, ax = plt.subplots()
+		totalLoanPrincipalHistory = \
+			zeros(len(self.timeHistory))
+		for loan in self.loanList:
+			totalLoanPrincipalHistory += loan.principalHistory
+			ax.plot(self.timeHistory,loan.principalHistory,label=loan.name)
+		ax.plot(self.timeHistory,totalLoanPrincipalHistory,
+			label='Total Loan Principal')
+		ax.set_title('Loan Principals')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+	def plotLoanInterest(self):
+		f, ax = plt.subplots()
+		totalLoanInterest = \
+			zeros(len(self.timeHistory))
+		for loan in self.loanList:
+			totalLoanInterest += loan.interestHistory
+			ax.plot(self.timeHistory, cumsum(loan.interestHistory),
+				label=loan.name)
+		ax.plot(self.timeHistory, cumsum(totalLoanInterest), 
+			label='Total Loan Interest')
+		ax.set_title('Accrued Loan Interest')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+	def plotLoanPayment(self):
+		f, ax = plt.subplots()
+		totalLoanPayment = \
+			zeros(len(self.timeHistory))
+		for loan in self.loanList:
+			totalLoanPayment += loan.paymentHistory
+			ax.plot(self.timeHistory, cumsum(loan.paymentHistory),
+				label=loan.name)
+		ax.plot(self.timeHistory, cumsum(totalLoanPayment), 
+			label='Total Loan Payment')
+		ax.set_title('Accrued Loan Payment')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+
+
+	def plotInvestmentPrincipal(self):
+		f, ax = plt.subplots()
+		totalInvestmentPrincipalHistory = \
+			zeros(len(self.timeHistory))
+		for investment in self.investmentList:
+			totalInvestmentPrincipalHistory += investment.principalHistory
+			plt.plot(self.timeHistory,investment.principalHistory,
+				label=investment.name)
+		plt.plot(self.timeHistory,totalInvestmentPrincipalHistory,
+			label='Total Investment Principal')
+		plt.title('Investment Principals')
+		plt.xlabel('Days Since Sim Start')
+		plt.ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+	def plotInvestmentInterest(self):
+		f, ax = plt.subplots()
+		totalInvestmentInterest = \
+			zeros(len(self.timeHistory))
+		for investment in self.investmentList:
+			totalInvestmentInterest += investment.interestHistory
+			ax.plot(self.timeHistory, cumsum(investment.interestHistory),
+				label=investment.name)
+		ax.plot(self.timeHistory, cumsum(totalInvestmentInterest), 
+			label='Total Loan Interest')
+		ax.set_title('Accrued Investment Interest')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+
 	def propagate(self):
 		#record initial states as state at t0
+
 		self.currentTime = self.startTime
 		self.timeHistory = []
 		self.currentCash = self.initialCash
 		self.cashHistory = []
-		
+		self.currentSavings = self.initialSavings
+		self.savingsHistory = []
 
 		###############################################################
 		#
 		# Initialize Values
+		#
+		# I think I can clean this up a bit with some reset functions
 		#
 		###############################################################
 
@@ -279,7 +375,6 @@ class simScenario:
 			job.currentSalary = job.initialSalary
 			job.monthlyPayHistory = []
 			job.withheldTaxHistory = []
-			job.retirementAccounts = []
 			job.salaryHistory = []
 
 
@@ -288,7 +383,6 @@ class simScenario:
 		# Main Simulation Loop
 		#
 		###############################################################
-
 		while self.currentTime <= self.endTime:
 			self.currentTime += self.timeStep
 			self.currentDate = self.startDate + timedelta(
@@ -307,7 +401,8 @@ class simScenario:
 				loan.accrue()
 				#makePayment with no keyword argument will pay minimum
 				#further payment may be made below
-				loan.makePayment()
+				if self.currentDate.day == 1: 
+					loan.makePayment()
 
 			###########################################################
 			#
@@ -359,15 +454,29 @@ class simScenario:
 			for expense in self.expenseList:
 				expense.spend()
 
-			# if self.currentDate.day == 1:
-			# 	# #put 1000 in savings account
-			# 	# if self.currentSavings <= 9000:
-			# 	# 	self.currentCash -= 1000
-			# 	# 	self.currentSavings += 1000
-			# 	if self.currentCash > 0:
-			# 		self.investmentList[0].contribute(self.currentCash)
-			# 	# if self.currentCash > 0:
-			# 	# 	self.loanList[0].makePayment(amt=self.currentCash)
+			# put $1000 into savings on 1st of each month.
+			if (self.startDate + timedelta(self.currentTime)).day == 1:
+				spendingMoney = self.currentCash - 3000
+				self.currentSpendingMoney = spendingMoney
+				print(spendingMoney)
+				savingsTransfer = 1000
+				spendingMoney -= savingsTransfer
+				self.currentCash -= savingsTransfer
+				self.currentSavings += savingsTransfer
+
+				#sort loan list by interest rate
+				self.loanList.sort(key=lambda x: x.interestRate, reverse=True)
+				paidFlag = 0			
+				for loan in self.loanList:
+					if loan.currentPrincipal > 0 and paidFlag == 0:
+						spendingMoney -= 1000
+						loan.makePayment(amt=1000)
+						paidFlag = 1
+						continue
+
+
+				self.currentCash -= spendingMoney
+
 
 
 			###########################################################

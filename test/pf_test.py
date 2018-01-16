@@ -146,17 +146,4 @@ def test_cashConserved():
 		assert( loan.checkConserved() )
 	assert( scen.checkConserved() )
 
-#still not sure the best way to test taxes.
-#scen.withheldTaxHistory is already cumulative, so summing it
-#doesn't really work the same way 
-scen.reset()
-scen.addJobs([job1, job2])
-scen.addLoans([loan1, loan2, loan3])
-scen.addInvestments([investment1, investment2, investment3])
-scen.addExpenses([exp1, exp2])
-scen.propagate()
-
-pdb.set_trace()
-
-
 

@@ -16,8 +16,31 @@ import accounts, simScenario
 import numpy as np
 import matplotlib.pyplot as plt
 import pdb
-
+from numpy.random import normal
 from datetime import date
+
+
+
+# def springForce(x,bias):
+# 	k = 0.1
+# 	u = normal(0,2)
+# 	return -k*(x - 9) + u
+
+# mean = np.array([])
+# y = np.empty((101,),float)
+# for j in range(0,100):
+# 	x = np.array([19])
+# 	bias = normal(0,1)
+# 	for i in range(0,100):
+# 		if i%10 == 0: k = abs(normal(0,1))
+# 		x = np.hstack([x, x[-1] + springForce(x[-1],bias)])
+# 	y = np.vstack([y,x])
+
+# y = y[1:]
+# plt.figure()
+# plt.plot(y.T)
+# plt.show()
+# pdb.set_trace()
 
 ###############################################################################
 #
@@ -30,16 +53,22 @@ MFS = accounts.investment()
 Putnam = accounts.investment()
 JennyTIAA = accounts.investment()
 MattTIAA = accounts.investment()
+MFSIRA = accounts.investment()
+PutnamIRA = accounts.investment()
 
 #add investment names
 MFS.name = "MFS"
 Putnam.name = "Putnam"
+MFSIRA.name = "MFS IRA"
+PutnamIRA.name = "Putnam IRA"
 JennyTIAA.name = "TIAA - Jenny"
 MattTIAA.name = "TIAA - Matt"
 
 #add investment prinicipals
-MFS.initialPrincipal = 64045.26
-Putnam.initialPrincipal = 98738.90
+MFS.initialPrincipal = 50368.27
+Putnam.initialPrincipal = 81222.72
+MFSIRA.initialPrincipal = 16763.95
+PutnamIRA.initialPrincipal = 13216.02
 JennyTIAA.initialPrincipal = 5914.13
 MattTIAA.initialPrincipal = 11675.65
 
@@ -47,6 +76,8 @@ MattTIAA.initialPrincipal = 11675.65
 #needs smarter model. Model as constant FTM
 MFS.interestRate = 9.0
 Putnam.interestRate = 9.0
+MFSIRA.interestRate = 9.0
+PutnamIRA.interestRate = 9.0
 JennyTIAA.interestRate = 9.0
 MattTIAA.interestRate = 9.0
 
@@ -135,17 +166,23 @@ Jenny = accounts.job()
 Jenny.initialSalary = 100360
 Jenny.payDOM = 20
 Jenny.name = "Jenny"
-Jenny.withholding = 2000
+Jenny.withholding = 1800
 Jenny.employer401kContributionPercent = 5
-Jenny.employer401kContributionStart = 0
-Jenny.employee401kContribution = 0
+Jenny.employer401kContributionStart = 182
+Jenny.employee401kContribution = 375
 Jenny.addRetirementAccounts([JennyTIAA])
+Jenny.insurancePremium = 0
 
 Matt = accounts.job()
 Matt.initialSalary = 85000
 Matt.payDOM = 20
 Matt.name = "Matt"
-Matt.withholding = 1700
+Matt.withholding = 1600
+Matt.employer401kContributionPercent = 5
+Matt.employer401kContributionStart = 182
+Matt.employee401kContribution = 375
+Matt.addRetirementAccounts([MattTIAA])
+Matt.insurancePremium = 0
 
 
 ###############################################################################
@@ -155,15 +192,18 @@ Matt.withholding = 1700
 ###############################################################################
 
 rent = accounts.expense()
-rent.name = 'Rent'
-rent.mean = 3000
-rent.std = 0
-rent.spendDOM = 1
-
 other = accounts.expense()
+
+rent.name = 'Rent'
 other.name = 'other'
-other.mean = 2000/30
+
+rent.mean = 3000
+other.mean = 4000/30
+
+rent.std = 0
 other.std = 500/30
+
+rent.spendDOM = 1
 other.spendDOM = -1 #daily expenses get spendDOM = -1
 
 ###############################################################################
@@ -175,6 +215,7 @@ other.spendDOM = -1 #daily expenses get spendDOM = -1
 #initialize sim scenario
 scen = simScenario.simScenario()
 scen.startDate = date(2018, 1, 1)
+scen.initialMutualFundAPR = 19
 scen.addLoans([
 	MattSallieMaeSmartOption,
 	Matt1_04DirectLoan,
@@ -187,11 +228,13 @@ scen.addLoans([
 	Jenny1_06DirectLoan,
 	Jenny1_07DirectLoan
 	])
-scen.addInvestments([
+scen.addMutualFunds([
 	MFS,
-	Putnam,
-	JennyTIAA,
-	MattTIAA
+	Putnam
+	])
+scen.addIRAs([
+	MFSIRA,
+	PutnamIRA
 	])
 scen.addJobs([
 	Jenny,
@@ -202,14 +245,16 @@ scen.addExpenses([
 	other
 	])
 scen.initialCash = 1e4
-scen.endTime = 365*10
+scen.endTime = 365*35
 scen.propagate()
 
-
-scen.plotLoanPrincipal()
-scen.plotLoanInterest()
-scen.plotInvestmentPrincipal()
-scen.plotInvestmentInterest()
-scen.plotLoanPayment()
+scen.plotAll()
+plt.plot(scen.mutualFundAPRHistory)
 plt.show()
+# scen.plotLoanPrincipal()
+# scen.plotLoanInterest()
+# scen.plotInvestmentPrincipal()
+# scen.plotInvestmentInterest()
+# scen.plotLoanPayment()
+# plt.show()
 pdb.set_trace()

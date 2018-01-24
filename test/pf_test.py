@@ -113,9 +113,15 @@ def test_investmentConservedQuantity():
 	#for it to be finished
 	scen.reset()
 	scen.addJobs([job1, job2])
-	scen.addInvestments([investment1, investment2, investment3])
+	scen.addMutualFunds([investment1])
+	scen.addIRAs([investment2])
+	scen.addTIAAs([investment3])
 	scen.propagate()
-	for investment in scen.investmentList:
+	for investment in scen.mutualFundList:
+		assert( investment.checkConserved() )
+	for investment in scen.IRAList:
+		assert( investment.checkConserved() )
+	for investment in scen.TIAAList:
 		assert( investment.checkConserved() )
 
 def test_loanConservedQuantity():
@@ -137,10 +143,18 @@ def test_cashConserved():
 	scen.reset()
 	scen.addJobs([job1, job2])
 	scen.addLoans([loan1, loan2, loan3])
-	scen.addInvestments([investment1, investment2, investment3])
+	scen.addMutualFunds([investment1])
+	scen.addIRAs([investment2])
+	scen.addTIAAs([investment3])
 	scen.addExpenses([exp1, exp2])
 	scen.propagate()
-	for investment in scen.investmentList:
+	for job in scen.jobList:
+		assert( job.checkConserved() )
+	for investment in scen.mutualFundList:
+		assert( investment.checkConserved() )
+	for investment in scen.IRAList:
+		assert( investment.checkConserved() )
+	for investment in scen.TIAAList:
 		assert( investment.checkConserved() )
 	for loan in scen.loanList:
 		assert( loan.checkConserved() )

@@ -7,8 +7,9 @@
 #	Synopsis: Vehicle portion of the explorer object model
 # 
 ###############################################################################
-from numpy import empty, hstack, array, cumsum, zeros
-from datetime import timedelta
+from numpy import empty, hstack, array, cumsum, zeros, repeat
+from numpy.random import normal
+from datetime import timedelta, datetime
 import matplotlib.pyplot as plt
 from sys import exit
 import pdb
@@ -21,12 +22,16 @@ class simScenario:
 		self.timeStep = 1
 		self.initialCash = 0
 		self.initialSavings = 0
+		self.initialMutualFundAPR = 0
 
 		#lists of objects belonging to scenario
 		self.loanList = []
-		self.investmentList = []
+		self.mutualFundList = []
+		self.IRAList = []
 		self.jobList = []
+		self.TIAAList = []
 		self.expenseList = []
+		self.mutualFundAPRHistory = []
 
 		#use reset method to initialize current values
 		#and history arrays
@@ -55,11 +60,17 @@ class simScenario:
 				self.currentSavings = self.initialSavings
 		except:
 			pass
+		try:
+			if kwargs['resetMF'] == 1: 
+				self.currentMutualFundAPR = self.initialMutualFundAPR
+		except:
+			pass
 
 		self.currentTaxesPaid = 0
 		self.currentTaxBill = 0
 		self.currentFICABill = 0
 		self.currentSpendingMoney = 0
+		
 
 	def resetHistory(self):
 		#clear history arrays
@@ -73,11 +84,23 @@ class simScenario:
 
 	def resetChildren(self):
 		#clear investments
-		for investment in self.investmentList:
+		for investment in self.mutualFundList:
 			investment.resetCurrent(resetPrincipal=1)
 			investment.resetHistory()
 			investment.resetChildren()
-		self.investmentList = []
+		self.mutualFundList = []
+
+		for investment in self.IRAList:
+			investment.resetCurrent(resetPrincipal=1)
+			investment.resetHistory()
+			investment.resetChildren()
+		self.IRAList = []
+
+		for investment in self.TIAAList:
+			investment.resetCurrent(resetPrincipal=1)
+			investment.resetHistory()
+			investment.resetChildren()
+		self.TIAAList = []
 
 		#clear loans
 		for loan in self.loanList:
@@ -115,6 +138,8 @@ class simScenario:
 			self.FICABillHistory, self.currentFICABill])
 		self.spendingMoneyHistory = hstack([
 			self.spendingMoneyHistory, self.currentSpendingMoney])
+		self.mutualFundAPRHistory = hstack([
+			self.mutualFundAPRHistory, self.currentMutualFundAPR])
 
 	def recordFinalValues(self):
 		self.finalTime = self.timeHistory[-1]
@@ -129,10 +154,20 @@ class simScenario:
 			loan.simScenario = self
 			self.loanList.append(loan)
 
-	def addInvestments(self,investmentList):
+	def addMutualFunds(self,investmentList):
 		for investment in investmentList:
 			investment.simScenario = self
-			self.investmentList.append(investment)
+			self.mutualFundList.append(investment)
+
+	def addIRAs(self,investmentList):
+		for investment in investmentList:
+			investment.simScenario = self
+			self.IRAList.append(investment)
+
+	def addTIAAs(self,investmentList):
+		for investment in investmentList:
+			investment.simScenario = self
+			self.TIAAList.append(investment)
 
 	def addExpenses(self,expenseList):
 		for expense in expenseList:
@@ -157,7 +192,13 @@ class simScenario:
 			totalPayment += cumsum(loan.paymentHistory)
 		for job in self.jobList:
 			totalPaycheck += cumsum(job.monthlyPayHistory)
-		for investment in self.investmentList:
+		for investment in self.mutualFundList:
+			totalContribution += cumsum(investment.contributionHistory)
+			totalWithdrawl += cumsum(investment.withdrawlHistory)
+		for investment in self.IRAList:
+			totalContribution += cumsum(investment.contributionHistory)
+			totalWithdrawl += cumsum(investment.withdrawlHistory)
+		for investment in self.TIAAList:
 			totalContribution += cumsum(investment.contributionHistory)
 			totalWithdrawl += cumsum(investment.withdrawlHistory)
 
@@ -170,7 +211,6 @@ class simScenario:
 			totalPaycheck + \
 			totalContribution + \
 			cumsum(self.taxesPaidHistory)
-
 		isConserved = sum(abs(conservedQuantity - self.initialCash))/\
 			len(conservedQuantity) < 1e-6
 
@@ -310,10 +350,19 @@ class simScenario:
 		f, ax = plt.subplots()
 		totalInvestmentPrincipalHistory = \
 			zeros(len(self.timeHistory))
-		for investment in self.investmentList:
+		for investment in self.mutualFundList:
 			totalInvestmentPrincipalHistory += investment.principalHistory
 			plt.plot(self.timeHistory,investment.principalHistory,
 				label=investment.name)
+		for investment in self.IRAList:
+			totalInvestmentPrincipalHistory += investment.principalHistory
+			plt.plot(self.timeHistory,investment.principalHistory,
+				label=investment.name)
+		for investment in self.TIAAList:
+			totalInvestmentPrincipalHistory += investment.principalHistory
+			plt.plot(self.timeHistory,investment.principalHistory,
+				label=investment.name)
+
 		plt.plot(self.timeHistory,totalInvestmentPrincipalHistory,
 			label='Total Investment Principal')
 		plt.title('Investment Principals')
@@ -326,7 +375,15 @@ class simScenario:
 		f, ax = plt.subplots()
 		totalInvestmentInterest = \
 			zeros(len(self.timeHistory))
-		for investment in self.investmentList:
+		for investment in self.mutualFundList:
+			totalInvestmentInterest += investment.interestHistory
+			ax.plot(self.timeHistory, cumsum(investment.interestHistory),
+				label=investment.name)
+		for investment in self.IRAList:
+			totalInvestmentInterest += investment.interestHistory
+			ax.plot(self.timeHistory, cumsum(investment.interestHistory),
+				label=investment.name)
+		for investment in self.TIAAList:
 			totalInvestmentInterest += investment.interestHistory
 			ax.plot(self.timeHistory, cumsum(investment.interestHistory),
 				label=investment.name)
@@ -339,16 +396,146 @@ class simScenario:
 		return ax
 
 
+	def plotInvestmentContribution(self):
+		f, ax = plt.subplots()
+		totalInvestmentContribution = \
+			zeros(len(self.timeHistory))
+		for investment in self.mutualFundList:
+			totalInvestmentContribution += investment.contributionHistory
+			ax.plot(self.timeHistory, cumsum(investment.contributionHistory),
+				label=investment.name)
+		for investment in self.IRAList:
+			totalInvestmentContribution += investment.contributionHistory
+			ax.plot(self.timeHistory, cumsum(investment.contributionHistory),
+				label=investment.name)
+		for investment in self.TIAAList:
+			totalInvestmentContribution += investment.contributionHistory
+			ax.plot(self.timeHistory, cumsum(investment.contributionHistory),
+				label=investment.name)
+		ax.plot(self.timeHistory, cumsum(totalInvestmentContribution), 
+			label='Total Investment Contribution')
+		ax.set_title('Accrued Investment Contributions')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+	def plotInvestmentWithdrawl(self):
+		f, ax = plt.subplots()
+		totalInvestmentWithdrawl = \
+			zeros(len(self.timeHistory))
+		for investment in self.mutualFundList:
+			totalInvestmentWithdrawl += investment.withdrawlHistory
+			ax.plot(self.timeHistory, cumsum(investment.withdrawlHistory),
+				label=investment.name)
+		for investment in self.IRAList:
+			totalInvestmentWithdrawl += investment.withdrawlHistory
+			ax.plot(self.timeHistory, cumsum(investment.withdrawlHistory),
+				label=investment.name)
+		for investment in self.TIAAList:
+			totalInvestmentWithdrawl += investment.withdrawlHistory
+			ax.plot(self.timeHistory, cumsum(investment.withdrawlHistory),
+				label=investment.name)
+		ax.plot(self.timeHistory, cumsum(totalInvestmentWithdrawl), 
+			label='Total Investment Contribution')
+		ax.set_title('Accrued Investment Contributions')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+	def plotPayHistory(self):
+		f, ax = plt.subplots()
+		totalPayHistory = \
+			zeros(len(self.timeHistory))
+		for job in self.jobList:
+			totalPayHistory += job.payHistory
+			ax.plot(self.timeHistory, cumsum(job.payHistory),
+				label=job.name)
+		ax.plot(self.timeHistory, cumsum(totalPayHistory), 
+			label='Total Pay History')
+		ax.set_title('Pay History')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+	def plotWitholdingHistory(self):
+		f, ax = plt.subplots()
+		totalWithheldTax = \
+			zeros(len(self.timeHistory))
+		for job in self.jobList:
+			totalWithheldTax += job.withheldTaxHistory
+			ax.plot(self.timeHistory, cumsum(job.withheldTaxHistory),
+				label=job.name)
+		ax.plot(self.timeHistory, cumsum(totalWithheldTax), 
+			label='Total Pay History')
+		ax.set_title('Tax Withholding History')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+	def plotInsurancePayments(self):
+		f, ax = plt.subplots()
+		totalInsurancePayments = \
+			zeros(len(self.timeHistory))
+		for job in self.jobList:
+			totalInsurancePayments += job.insurancePaymentHistory
+			ax.plot(self.timeHistory, cumsum(job.insurancePaymentHistory),
+				label=job.name)
+		ax.plot(self.timeHistory, cumsum(totalInsurancePayments), 
+			label='Total Pay History')
+		ax.set_title('Insurance Payment History')
+		ax.set_xlabel('Days Since Sim Start')
+		ax.set_ylabel('Dollars')
+		ax.legend(prop={'size': 8})
+		return ax
+
+	def plotAll(self):
+		self.plotLoanPrincipal()
+		self.plotLoanInterest()
+		self.plotLoanPayment()
+		self.plotInvestmentPrincipal()
+		self.plotInvestmentInterest()
+		self.plotInvestmentContribution()
+		self.plotInvestmentWithdrawl()
+		self.plotPayHistory()
+		self.plotWitholdingHistory()
+		self.plotInsurancePayments()
+
+	def springForce(self,x,k,sigma,mean,restPoint):
+		u = normal(mean,sigma)
+		return -k*(x - restPoint) + u
+
+	def calculateMutualFundAPR(self):
+		'''!
+		calculateMutualFundAPR() is used to pre-calculate the mutual fund
+		annual percentage rate. With model I came up with, I only wanted
+		APR to be updated once a month, and rather than put an if statement
+		in the main simulation loop.
+		'''
+		self.mutualFundAPR = array([self.initialMutualFundAPR])
+		scenarioDuration = self.endTime-self.startTime
+		for i in range(int(scenarioDuration/30)):
+			currentAPR = self.mutualFundAPR[-1]
+			self.mutualFundAPR = hstack([self.mutualFundAPR,
+				currentAPR + \
+				self.springForce(currentAPR,0.1,2.,0.,9.)])
+		self.mutualFundAPR = \
+			repeat(self.mutualFundAPR,30)[0:scenarioDuration+1]
+
 	def propagate(self):
 		#record initial states as state at t0
-
+		start = datetime.now()
 		self.currentTime = self.startTime
 		self.timeHistory = []
 		self.currentCash = self.initialCash
 		self.cashHistory = []
 		self.currentSavings = self.initialSavings
 		self.savingsHistory = []
-
+		self.currentMutualFundAPR = self.initialMutualFundAPR
+		self.mutualFundAPRHistory = []
 		###############################################################
 		#
 		# Initialize Values
@@ -364,7 +551,21 @@ class simScenario:
 			loan.paymentHistory = []
 			loan.principalHistory = []
 
-		for investment in self.investmentList:
+		for investment in self.mutualFundList:
+			investment.currentPrincipal = investment.initialPrincipal
+			investment.principalHistory = investment.currentPrincipal
+			investment.principalHistory = []
+			investment.interestHistory = []
+			investment.contributionHistory = []
+
+		for investment in self.IRAList:
+			investment.currentPrincipal = investment.initialPrincipal
+			investment.principalHistory = investment.currentPrincipal
+			investment.principalHistory = []
+			investment.interestHistory = []
+			investment.contributionHistory = []
+
+		for investment in self.TIAAList:
 			investment.currentPrincipal = investment.initialPrincipal
 			investment.principalHistory = investment.currentPrincipal
 			investment.principalHistory = []
@@ -377,6 +578,7 @@ class simScenario:
 			job.withheldTaxHistory = []
 			job.salaryHistory = []
 
+		print(datetime.now() - start)
 
 		###############################################################
 		#
@@ -384,6 +586,7 @@ class simScenario:
 		#
 		###############################################################
 		while self.currentTime <= self.endTime:
+			print(datetime.now() - start)
 			self.currentTime += self.timeStep
 			self.currentDate = self.startDate + timedelta(
 				self.currentTime)
@@ -397,21 +600,28 @@ class simScenario:
 			#
 			###########################################################
 
+			#makePayment with no keyword argument will pay minimum
+			#further payment may be made below
+			if self.currentDate.day == 1: 
+				self.currentMutualFundAPR += \
+					self.springForce(self.currentMutualFundAPR,0.1,2.,0.,9.)
+				for loan in self.loanList:
+					loan.makePayment()
 			for loan in self.loanList:
 				loan.accrue()
-				#makePayment with no keyword argument will pay minimum
-				#further payment may be made below
-				if self.currentDate.day == 1: 
-					loan.makePayment()
 
 			###########################################################
 			#
 			# Investments accrue interest continually. It is calculated
-			# at each time step. i
+			# at each time step. 
 			#
 			###########################################################
 
-			for investment in self.investmentList:
+			for investment in self.mutualFundList:
+				investment.accrue()
+			for investment in self.IRAList:
+				investment.accrue()
+			for investment in self.TIAAList:
 				investment.accrue()
 
 			###########################################################
@@ -436,9 +646,6 @@ class simScenario:
 			if self.currentTime%365 == 105:
 				self.payTaxes('Federal')
 				self.payTaxes('California')
-				for job in self.jobList: 
-					job.currentYearToDatePay = 0
-					job.currentWithheldTax = 0
 
 			# if self.currentTime%365 == 1:
 			# 	for job in self.jobList:
@@ -455,10 +662,10 @@ class simScenario:
 				expense.spend()
 
 			# put $1000 into savings on 1st of each month.
-			if (self.startDate + timedelta(self.currentTime)).day == 1:
+			if self.currentDate.day == 1:
 				spendingMoney = self.currentCash - 3000
 				self.currentSpendingMoney = spendingMoney
-				print(spendingMoney)
+
 				savingsTransfer = 1000
 				spendingMoney -= savingsTransfer
 				self.currentCash -= savingsTransfer
@@ -466,17 +673,23 @@ class simScenario:
 
 				#sort loan list by interest rate
 				self.loanList.sort(key=lambda x: x.interestRate, reverse=True)
-				paidFlag = 0			
 				for loan in self.loanList:
-					if loan.currentPrincipal > 0 and paidFlag == 0:
+					if loan.currentPrincipal > 0:
 						spendingMoney -= 1000
 						loan.makePayment(amt=1000)
-						paidFlag = 1
-						continue
+						break
 
+				for investment in self.IRAList:
+					investment.contribute(230*0.9)
+					spendingMoney-=230
+
+				for investment in self.mutualFundList:
+					investment.contribute(spendingMoney/2*0.9)
+
+				spendingMoney = 0
 
 				self.currentCash -= spendingMoney
-
+				self.currentSavings += spendingMoney
 
 
 			###########################################################
@@ -497,7 +710,13 @@ class simScenario:
 				loan.recordValues()
 				loan.resetCurrent()
 
-			for investment in self.investmentList:
+			for investment in self.mutualFundList:
+				investment.recordValues()
+				investment.resetCurrent()
+			for investment in self.IRAList:
+				investment.recordValues()
+				investment.resetCurrent()
+			for investment in self.TIAAList:
 				investment.recordValues()
 				investment.resetCurrent()
 
@@ -517,7 +736,11 @@ class simScenario:
 		for loan in self.loanList:
 			loan.recordFinalValues()
 
-		for investment in self.investmentList:
+		for investment in self.mutualFundList:
+			investment.recordFinalValues()
+		for investment in self.IRAList:
+			investment.recordFinalValues()
+		for investment in self.TIAAList:
 			investment.recordFinalValues()
 
 		for job in self.jobList:

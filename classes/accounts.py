@@ -66,7 +66,7 @@ class investment:
 		# A = P*e^(rt)
 		# A = P*(1+r/n)^(nt))
 		P = self.currentPrincipal
-		r = self.interestRate/100.
+		r = self.simScenario.currentMutualFundAPR/100.
 		t = self.simScenario.timeStep/365.
 
 		newPrincipal = P*exp(r*t)
@@ -133,7 +133,6 @@ class loan:
 		self.paymentHistory = hstack([
 			self.paymentHistory, self.currentPayment])
 
-
 	def recordFinalValues(self):
 		self.finalinterest = self.interestHistory[-1]
 		self.finalPayment = self.paymentHistory[-1]
@@ -143,7 +142,6 @@ class loan:
 		# A = P*e^(rt)
 		# A = P*(1+r/n)^(nt))
 		self.currentInterest = 0
-		self.currentPayment = 0
 		P = self.currentPrincipal
 		r = self.interestRate/100.
 		t = self.simScenario.timeStep/365.
@@ -159,9 +157,9 @@ class loan:
 			amt = self.minimumPayment
 
 		if self.currentPrincipal > amt:
-			self.currentPrincipal -= amt
 			self.simScenario.currentCash -= amt
 			self.currentPayment += amt
+			self.currentPrincipal -= amt
 		else:
 			self.simScenario.currentCash -= self.currentPrincipal
 			self.currentPayment += self.currentPrincipal
@@ -209,15 +207,21 @@ class job:
 		self.current401kContributions = 0
 		self.currentMonthlyPay = 0
 		self.currentWithheldTax = 0
+		self.currentInsurancePayment = 0
 
 	def resetHistory(self):
 		#clear history arrays
 		self.salaryHistory = []
+		#not sure that we really need these IRA and 401k
+		#contribution histories. This information is
+		#contained in the contributionHisotry arrays of
+		#the investments in the IRA nd 401k lists
 		self.IRAContributionHistory = []
 		self._401kContributionHistory = []
 		self.monthlyPayHistory = []
 		self.withheldTaxHistory = []
 		self.payHistory = []
+		self.insurancePaymentHistory = []
 
 	def resetChildren(self):
 		self.retirementAccounts = []
@@ -235,6 +239,8 @@ class job:
 			self.withheldTaxHistory, self.currentWithheldTax])
 		self.payHistory = hstack([
 			self.payHistory, self.currentPay])
+		self.insurancePaymentHistory = hstack([
+			self.insurancePaymentHistory, self.currentInsurancePayment])
 
 	def recordFinalValues(self):
 		self.finalSalary = self.salaryHistory[-1]
@@ -248,6 +254,7 @@ class job:
 		conservedQuantity = \
 			self.withheldTaxHistory + \
 			self.monthlyPayHistory + \
+			self.insurancePaymentHistory + \
 			self.IRAContributionHistory + \
 			self._401kContributionHistory
 
@@ -273,17 +280,19 @@ class job:
 			self.currentMonthlyPay -= self.employee401kContribution
 			investment.currentPrincipal += self.employee401kContribution
 			self.current401kContributions += self.employee401kContribution
-			print(self.simScenario.currentTime)
 			if self.simScenario.currentTime > self.employer401kContributionStart:
 				employerContribution = self.currentSalary/12.*\
 					self.employer401kContributionPercent/100
 				investment.currentPrincipal += employerContribution
 				self.current401kContributions += employerContribution
-				print(employerContribution)
 
 	def withhold(self):
 		self.currentMonthlyPay -= self.withholding
 		self.currentWithheldTax += self.withholding
+
+	def payInsurance(self):
+		self.currentMonthlyPay -= self.insurancePremium
+		self.currentWithheldTax += self.insurancePremium
 
 	def addRetirementAccounts(self, accounts):
 		for account in accounts:

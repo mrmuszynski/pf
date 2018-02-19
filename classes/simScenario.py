@@ -12,6 +12,7 @@ from numpy.random import normal
 from datetime import timedelta, datetime
 import matplotlib.pyplot as plt
 from sys import exit
+import accounts
 import pdb
 
 class simScenario:
@@ -180,48 +181,13 @@ class simScenario:
 			job.simScenario = self
 			self.jobList.append(job)
 
-	def checkConserved(self):
-		totalSpend = 0
-		totalPayment = 0
-		totalPaycheck = 0
-		totalContribution = 0
-		totalWithdrawl = 0
-		for expense in self.expenseList:
-			totalSpend += cumsum(expense.spendHistory)
-		for loan in self.loanList:
-			totalPayment += cumsum(loan.paymentHistory)
-		for job in self.jobList:
-			totalPaycheck += cumsum(job.monthlyPayHistory)
-		for investment in self.mutualFundList:
-			totalContribution += cumsum(investment.contributionHistory)
-			totalWithdrawl += cumsum(investment.withdrawlHistory)
-		for investment in self.IRAList:
-			totalContribution += cumsum(investment.contributionHistory)
-			totalWithdrawl += cumsum(investment.withdrawlHistory)
-		for investment in self.TIAAList:
-			totalContribution += cumsum(investment.contributionHistory)
-			totalWithdrawl += cumsum(investment.withdrawlHistory)
 
-		conservedQuantity = \
-			self.cashHistory + \
-			self.savingsHistory + \
-			totalSpend + \
-			totalPayment - \
-			totalWithdrawl - \
-			totalPaycheck + \
-			totalContribution + \
-			cumsum(self.taxesPaidHistory)
-		isConserved = sum(abs(conservedQuantity - self.initialCash))/\
-			len(conservedQuantity) < 1e-6
+	#####################################################################
+	#
+	#	
+	#
+	#####################################################################
 
-		return isConserved
-
-	# def checkTaxConserved(self):
-	# 	conservedQuantity = 
-	# 	payHistory
-	# 	pdb.set_trace()
-	# 	isConserved = True
-	# 	return isConserved
 
 	def payTaxes(self,taxType):
 		taxableIncome = 0.
@@ -296,6 +262,83 @@ class simScenario:
 
 		self.currentTaxesPaid += (self.currentTaxBill + self.currentFICABill - withholding)
 		self.currentCash -= (self.currentTaxBill + self.currentFICABill - withholding)
+
+	def buyHouse(self):
+		#https://www.thebalance.com/loan-payment-calculations-315564
+		print('You bought a house on ' + str(self.currentDate))
+		print('Your House Cost ' + str(self.firstHomeCost))
+		print('20% of which is ' + str(0.2*self.firstHomeCost))
+		print('You Have ' + str(self.currentSavings) + ' in savings')
+		print('You Have ' + str(self.currentCash) + ' in cash')
+		mutualFundPrincipal = 0
+		for fund in self.mutualFundList:
+			mutualFundPrincipal += fund.currentPrincipal
+		print('You Have ' + str(mutualFundPrincipal) + ' in Mutual Funds')
+		print('Mutual Funds account for ' + str(
+			100*mutualFundPrincipal/(0.2*self.firstHomeCost))+ \
+			' percent of a 20% down payment')
+		self.mortgageRate = 4.5
+		A = 0.8*self.firstHomeCost
+		monthlyInterestRate = self.mortgageRate/12/100
+		D = ((1+monthlyInterestRate)**360-1)/\
+			(monthlyInterestRate*(1+monthlyInterestRate)**360)
+		P = A/D
+		print('Monthly Payment at ' + str(self.mortgageRate) + \
+			'% is ' + str(P))
+		homeLoan = accounts.loan()
+		homeLoan.initialPrincipal = 0.8*self.firstHomeCost
+		homeLoan.interestRate = 4.5
+		homeLoan.minimumPayment = P
+		# self.addLoans([homeLoan])
+		self.firstHomeDate = 1e12
+
+	#####################################################################
+	#
+	#	Conservation Checks
+	#
+	#####################################################################
+
+	def checkConserved(self):
+		totalSpend = 0
+		totalPayment = 0
+		totalPaycheck = 0
+		totalContribution = 0
+		totalWithdrawl = 0
+		for expense in self.expenseList:
+			totalSpend += cumsum(expense.spendHistory)
+		for loan in self.loanList:
+			totalPayment += cumsum(loan.paymentHistory)
+		for job in self.jobList:
+			totalPaycheck += cumsum(job.monthlyPayHistory)
+		for investment in self.mutualFundList:
+			totalContribution += cumsum(investment.contributionHistory)
+			totalWithdrawl += cumsum(investment.withdrawlHistory)
+		for investment in self.IRAList:
+			totalContribution += cumsum(investment.contributionHistory)
+			totalWithdrawl += cumsum(investment.withdrawlHistory)
+		for investment in self.TIAAList:
+			totalContribution += cumsum(investment.contributionHistory)
+			totalWithdrawl += cumsum(investment.withdrawlHistory)
+
+		conservedQuantity = \
+			self.cashHistory + \
+			self.savingsHistory + \
+			totalSpend + \
+			totalPayment - \
+			totalWithdrawl - \
+			totalPaycheck + \
+			totalContribution + \
+			cumsum(self.taxesPaidHistory)
+		isConserved = sum(abs(conservedQuantity - self.initialCash))/\
+			len(conservedQuantity) < 1e-6
+
+		return isConserved
+
+	#####################################################################
+	#
+	#	Plotting Functions
+	#
+	#####################################################################
 
 	def plotLoanPrincipal(self):
 		f, ax = plt.subplots()
@@ -438,7 +481,7 @@ class simScenario:
 				label=investment.name)
 		ax.plot(self.timeHistory, cumsum(totalInvestmentWithdrawl), 
 			label='Total Investment Contribution')
-		ax.set_title('Accrued Investment Contributions')
+		ax.set_title('Accrued Investment Withdrawls')
 		ax.set_xlabel('Days Since Sim Start')
 		ax.set_ylabel('Dollars')
 		ax.legend(prop={'size': 8})
@@ -536,6 +579,10 @@ class simScenario:
 		self.savingsHistory = []
 		self.currentMutualFundAPR = self.initialMutualFundAPR
 		self.mutualFundAPRHistory = []
+
+		self.firstHomeDate = normal(self.firstHomeDate,self.firstHomeDateSTD)
+		self.firstHomeCost = normal(self.firstHomeCost,self.firstHomeCostSTD)
+
 		###############################################################
 		#
 		# Initialize Values
@@ -578,7 +625,6 @@ class simScenario:
 			job.withheldTaxHistory = []
 			job.salaryHistory = []
 
-		print(datetime.now() - start)
 
 		###############################################################
 		#
@@ -586,10 +632,12 @@ class simScenario:
 		#
 		###############################################################
 		while self.currentTime <= self.endTime:
-			print(datetime.now() - start)
 			self.currentTime += self.timeStep
 			self.currentDate = self.startDate + timedelta(
 				self.currentTime)
+
+			if self.firstHomeDate - self.currentTime < 1:
+				self.buyHouse()
 
 			###########################################################
 			#
@@ -735,7 +783,7 @@ class simScenario:
 		###############################################################
 		for loan in self.loanList:
 			loan.recordFinalValues()
-
+			
 		for investment in self.mutualFundList:
 			investment.recordFinalValues()
 		for investment in self.IRAList:

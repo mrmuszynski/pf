@@ -20,28 +20,6 @@ from numpy.random import normal
 from datetime import date
 
 
-
-# def springForce(x,bias):
-# 	k = 0.1
-# 	u = normal(0,2)
-# 	return -k*(x - 9) + u
-
-# mean = np.array([])
-# y = np.empty((101,),float)
-# for j in range(0,100):
-# 	x = np.array([19])
-# 	bias = normal(0,1)
-# 	for i in range(0,100):
-# 		if i%10 == 0: k = abs(normal(0,1))
-# 		x = np.hstack([x, x[-1] + springForce(x[-1],bias)])
-# 	y = np.vstack([y,x])
-
-# y = y[1:]
-# plt.figure()
-# plt.plot(y.T)
-# plt.show()
-# pdb.set_trace()
-
 ###############################################################################
 #
 #	Add Investment Accounts
@@ -216,6 +194,16 @@ other.spendDOM = -1 #daily expenses get spendDOM = -1
 scen = simScenario.simScenario()
 scen.startDate = date(2018, 1, 1)
 scen.initialMutualFundAPR = 19
+
+scen.firstHomeDate = 365*2
+scen.firstHomeDateSTD = 180
+scen.firstHomeCost = 8e5
+scen.firstHomeCostSTD = 2e5
+scen.firstChildDate = 365*2
+scen.firstChildSTD = 180
+scen.monthlyChildCost = 2000
+scen.childCostSTD = 1000
+
 scen.addLoans([
 	MattSallieMaeSmartOption,
 	Matt1_04DirectLoan,
@@ -249,6 +237,7 @@ scen.endTime = 365*35
 scen.propagate()
 
 scen.plotAll()
+plt.figure()
 plt.plot(scen.mutualFundAPRHistory)
 plt.show()
 # scen.plotLoanPrincipal()
